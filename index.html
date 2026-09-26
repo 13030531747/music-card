@@ -621,10 +621,29 @@ let nowPlaying = null;               // 最近一次播放的卡片记录（暂�
 /* ============================================================
    E0. 下载 / 提示
    ============================================================ */
-function baseName(p){ return p.split('/').pop(); }
+function baseName(p){
+  if (p.startsWith('data:')) return '';        // 内嵌音频没有磁盘文件名
+  return p.split('/').pop();
+}
+
+/* MIME → 扩展名，保证下载出来的后缀和真实编码一致 */
+const MIME_EXT = {
+  'audio/mpeg':'mp3', 'audio/mp3':'mp3', 'audio/wav':'wav', 'audio/x-wav':'wav',
+  'audio/ogg':'ogg', 'audio/opus':'opus', 'audio/mp4':'m4a', 'audio/aac':'aac',
+  'audio/flac':'flac', 'audio/x-flac':'flac', 'audio/webm':'weba'
+};
+
+/* 曲名里不能出现的字符，统一换成下划线（Windows 文件名规则） */
+function safeName(s){ return s.replace(/[\\/:*?"<>|]/g, '_').trim() || '未命名'; }
 
 function download(file, title, btn){
-  const name = baseName(file);
+  let name = baseName(file);
+  if (!name){
+    /* 内嵌版：用曲名当文件名 */
+    const m = /^data:([^;,]+)/.exec(file);
+    const ext = MIME_EXT[(m && m[1] || '').toLowerCase()] || 'mp3';
+    name = safeName(title) + '.' + ext;
+  }
   const a = document.createElement('a');
   a.href = file;
   a.download = name;
@@ -978,8 +997,6 @@ function syncMini(cur, dur, p, showNow){
   if (showNow){
     miniEl.classList.add('is-on');
     miniTitle.textContent = nowPlaying.t.title;
-    miniDl.dataset.file  = nowPlaying.t.file;
-    miniDl.dataset.title = nowPlaying.t.title;
   }
   /* 只在秒数变化时改文本，避免每帧触发重排 */
   const txt = fmtTime(cur) + ' / ' + fmtTime(a.duration);
@@ -998,8 +1015,8 @@ miniGo.addEventListener('click', () => {
 });
 
 miniDl.addEventListener('click', () => {
-  if (!miniDl.dataset.file) return;
-  download(miniDl.dataset.file, miniDl.dataset.title, null);
+  if (!nowPlaying) return;
+  download(nowPlaying.t.file, nowPlaying.t.title, null);
 });
 
 /* ---- 启动 ---- */
