@@ -1,0 +1,95 @@
+# 音乐卡片播放器
+
+一个单文件（HTML + CSS + 原生 JS，零依赖）的音频卡片播放器。
+
+## 功能
+
+- 🎵 **12 首曲目**，卡片式布局，点击封面圆形按钮播放
+- 🔄 **单例播放** —— 播新的会自动停掉上一首
+- 🎧 **后台继续播放** —— 切标签页、切窗口、最小化都不中断
+- 🌙 **防休眠** —— 播放期间申请 Screen Wake Lock，避免系统省电把声音掐断
+- ⬇️ **两种下载入口** —— 封面右上角悬停按钮、右下角迷你播放器常驻按钮
+- 🔍 **实时搜索** —— 按标题 / 描述 / 标签过滤，不影响正在播放的音频
+- 📌 **迷你悬浮播放器** —— 滚到页面底部或过滤后仍能控制当前曲目
+- 📱 **移动端适配** —— 窄屏下迷你播放器自动铺满底部
+
+## 目录结构
+
+```
+音乐卡片播放器/
+├── index.html      播放器（单文件，含全部样式与脚本）
+├── audio/          12 首 MP3，共约 23 MB
+└── README.md
+```
+
+## 本地使用
+
+### 方式一：起一个本地服务器（推荐）
+
+浏览器的 `file://` 协议禁止网页加载本地音频文件，所以直接双击 `index.html` 会没有声音。用任意静态服务器即可：
+
+```bash
+# Python（装了 Python 就自带）
+python -m http.server 8931
+
+# 或 Node.js
+npx serve .
+```
+
+然后访问 <http://127.0.0.1:8931/index.html>。
+
+### 方式二：直接双击
+
+如果只是看看界面，直接双击 `index.html` 也能打开，但**音频无法加载**。
+
+## 部署到 GitHub Pages
+
+> ⚠️ GitHub Pages 对**私有仓库**需要付费账号（GitHub Pro）。免费账号请把仓库设为 Public，或者见下方"仅自己可见"的做法。
+
+```bash
+git init
+git add .
+git commit -m "feat: 音乐卡片播放器"
+git branch -M main
+git remote add origin https://github.com/<你的用户名>/music-card.git
+git push -u origin main
+```
+
+推送后在仓库页面进入 **Settings → Pages**：
+
+- Source 选 `Deploy from a branch`
+- Branch 选 `main`，目录选 `/ (root)`
+- 保存，等 1~2 分钟
+
+访问地址：`https://<你的用户名>.github.io/music-card/`
+
+### 想公开但不想被搜到
+
+把仓库设为 Public（免费开 Pages 用），但**不要**在 GitHub 仓库页面的 About 里填描述和 Topics，也不要发到任何社区。这样只有知道你链接的人才能打开，搜索引擎基本不会收录。
+
+另外可以在仓库根目录加一个 `robots.txt` 阻止爬虫：
+
+```
+User-agent: *
+Disallow: /
+```
+
+## 技术说明
+
+- **零依赖**：没有框架、没有构建步骤、没有 CDN 引用，全部内联
+- **单例播放**：模块级 `current` 对象持有当前播放的 `{ audio, card, canvas, raf }`
+- **非破坏性过滤**：12 张卡一次性建入 DOM，搜索只切换 `hidden`，永不打断播放
+- **Canvas 进度环**：`requestAnimationFrame` 驱动，支持 `atan2` 拖动跳转
+- **Wake Lock**：播放时申请、暂停/播完/切换时释放，不白耗电
+
+### 关于后台播放
+
+旧版代码在 `visibilitychange` 事件里调 `stopCurrent()` 主动暂停 —— 这才是"切页面音乐就停"的真正原因。移除后，浏览器本身对后台 `<audio>` 是宽容的：只要标签页没被丢弃、电脑没休眠，声音就会继续。
+
+唯一剩下的现实打断源是系统为省电主动休眠，所以播放期间用 Screen Wake Lock 顶住。
+
+**副作用**：屏幕不会自动熄屏。暂停或播完后会自动释放。
+
+## 授权
+
+代码部分可自由使用。`audio/` 目录下的音乐素材版权归各自作者所有，请自行确认使用授权。

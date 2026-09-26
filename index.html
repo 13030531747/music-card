@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>音效卡片 · 可播放</title>
+<style>
+/* ============ 设计变量 ============ */
+:root{
+  --bg:#0f1216;
+  --panel:#171b21;
+  --ink:#e8ecf1;
+  --ink-2:#9aa5b1;
+  --ink-3:#6b7683;
+  --line:rgba(255,255,255,.08);
+  --accent:#7bdcff;
+  --r:14px;
+  --shadow:
+    0 4px 6px rgba(0,0,0,.28),
+    0 10px 24px rgba(0,0,0,.34),
+    0 24px 56px rgba(0,0,0,.36);
+  --shadow-hi:
+    0 6px 10px rgba(0,0,0,.34),
+    0 18px 40px rgba(0,0,0,.42),
+    0 36px 80px rgba(0,0,0,.44);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font:14px/1.65 "Microsoft Yahei","Hiragino Sans GB","Helvetica Neue",Helvetica,tahoma,arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:72px;
+  background-image:
+    radial-gradient(900px 500px at 12% -8%, rgba(123,220,255,.09), transparent 60%),
+    radial-gradient(800px 450px at 88% 4%, rgba(255,140,180,.07), transparent 62%);
+  background-attachment:fixed;
+}
+a{color:inherit;text-decoration:none}
+
+/* ============ 页头 ============ */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(15,18,22,.82);
+  backdrop-filter:blur(14px) saturate(1.4);
+  border-bottom:1px solid var(--line);
+}
+.topbar__in{max-width:1400px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:18px}
+.brand{font-size:17px;font-weight:700;letter-spacing:.6px;white-space:nowrap}
+.brand em{color:var(--accent);font-style:normal}
+.hint{margin-left:auto;font-size:12px;color:var(--ink-3);white-space:nowrap}
+@media(max-width:900px){.hint{display:none}}
+
+/* ---- 搜索框 ---- */
+.search{
+  flex:0 1 340px;margin-left:auto;
+  display:flex;align-items:center;gap:9px;
+  height:38px;padding:0 8px 0 15px;
+  background:rgba(255,255,255,.055);
+  border:1px solid var(--line);
+  border-radius:19px;
+  transition:box-shadow .2s,background .2s,border-color .2s;
+}
+.search:focus-within{
+  background:rgba(255,255,255,.085);
+  border-color:rgba(123,220,255,.42);
+  box-shadow:0 0 0 3px rgba(123,220,255,.13);
+}
+.search svg{width:15px;height:15px;fill:var(--ink-3);flex:none}
+.search input{
+  flex:1;min-width:0;border:0;background:transparent;outline:none;
+  font:inherit;color:var(--ink);
+}
+.search input::placeholder{color:var(--ink-3)}
+.search__clear{
+  flex:none;width:22px;height:22px;border:0;padding:0;cursor:pointer;
+  display:none;place-items:center;border-radius:50%;
+  background:rgba(255,255,255,.12);color:var(--ink-2);
+  font-size:13px;line-height:1;
+}
+.search__clear:hover{background:rgba(255,255,255,.22);color:#fff}
+.search.has-value .search__clear{display:grid}
+@media(max-width:640px){.search{flex:1 1 auto;margin-left:0}}
+
+/* ============ 布局 ============ */
+.wrap{max-width:1400px;margin:0 auto;padding:0 28px}
+.sect-title{margin:36px 0 6px;font-size:24px;font-weight:600;letter-spacing:.3px}
+.sect-sub{color:var(--ink-2);margin:0 0 18px;font-size:13px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sect-sub b{color:var(--accent)}
+.spinner{
+  width:13px;height:13px;border-radius:50%;flex:none;
+  border:2px solid rgba(255,255,255,.18);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- 快捷标签 ---- */
+.quick{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 24px}
+.quick__btn{
+  font:inherit;font-size:12px;line-height:1;
+  padding:6px 11px;border-radius:15px;cursor:pointer;
+  background:rgba(255,255,255,.045);
+  border:1px solid var(--line);
+  color:var(--ink-2);
+  transition:all .16s;
+}
+.quick__btn:hover{background:rgba(123,220,255,.12);color:var(--accent);border-color:rgba(123,220,255,.32)}
+.quick__btn.is-on{background:rgba(123,220,255,.18);color:var(--accent);border-color:rgba(123,220,255,.45)}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:26px;
+  align-items:start;
+}
+
+/* ---- 空结果 ---- */
+.empty{
+  display:none;
+  padding:70px 20px;text-align:center;
+  border:1px dashed var(--line);border-radius:var(--r);
+  color:var(--ink-3);
+}
+.empty.is-on{display:block}
+.empty b{display:block;font-size:16px;color:var(--ink-2);margin-bottom:6px;font-weight:600}
+
+/* ============ 卡片 ============ */
+.card{
+  position:relative;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  transition:transform .28s cubic-bezier(.2,.7,.3,1),box-shadow .28s,border-color .28s;
+}
+.card:hover{transform:translateY(-5px);box-shadow:var(--shadow-hi);border-color:rgba(255,255,255,.14)}
+.card.is-playing{border-color:rgba(123,220,255,.42)}
+.card[hidden]{display:none}
+
+/* ---- 封面区 ---- */
+.cover{
+  position:relative;
+  padding-bottom:64%;
+  overflow:hidden;
+  background-size:cover;background-position:center;
+}
+.cover::after{                       /* 暗角，让圆环和文字浮出来 */
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 46%, transparent 30%, rgba(0,0,0,.38) 100%);
+  pointer-events:none;
+}
+.card.is-playing .cover::before{     /* 播放时整块封面轻微呼吸 */
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 46%, rgba(123,220,255,.16), transparent 62%);
+  animation:breathe 3.4s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* 圆环播放器 */
+.player{
+  position:absolute;inset:0;
+  display:grid;place-items:center;
+  z-index:3;
+}
+.ring{
+  position:relative;
+  width:132px;height:132px;
+  border:0;background:none;padding:0;
+  cursor:pointer;
+  border-radius:50%;
+  transition:transform .2s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.ring:hover{transform:scale(1.05)}
+.ring:active{transform:scale(.98)}
+.ring canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ring__mid{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:2px;
+  pointer-events:none;
+}
+.ring__icon{width:26px;height:26px;fill:#fff;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))}
+.ring__icon.--pause{display:none}
+.card.is-playing .ring__icon.--play{display:none}
+.card.is-playing .ring__icon.--pause{display:block}
+.ring__time{
+  font:11px/1 ui-monospace,"Cascadia Mono",Consolas,monospace;
+  color:rgba(255,255,255,.82);
+  letter-spacing:.4px;
+  text-shadow:0 1px 3px rgba(0,0,0,.6);
+}
+
+/* 封面文字 */
+.cover__meta{
+  position:absolute;left:0;right:0;bottom:0;z-index:4;
+  padding:40px 16px 13px;
+  background:linear-gradient(to top,rgba(0,0,0,.78),rgba(0,0,0,.34) 52%,transparent);
+  pointer-events:none;
+}
+.cover__title{
+  font-size:16px;font-weight:700;line-height:1.35;color:#fff;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+.cover__row{margin-top:5px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}
+.cover__tag{
+  padding:2px 8px;border-radius:20px;flex:none;
+  background:rgba(255,255,255,.16);
+  border:1px solid rgba(255,255,255,.22);
+  color:#fff;font-size:11px;letter-spacing:.3px;
+  backdrop-filter:blur(4px);
+}
+
+/* 封面右上角操作（下载） */
+.acts{position:absolute;top:10px;right:10px;z-index:6;display:flex;gap:8px}
+.act{
+  width:34px;height:34px;border-radius:50%;
+  display:grid;place-items:center;
+  background:rgba(0,0,0,.36);
+  border:1px solid rgba(255,255,255,.18);
+  backdrop-filter:blur(6px);
+  cursor:pointer;opacity:.68;
+  transition:opacity .2s,transform .2s,background .2s,border-color .2s;
+}
+.card:hover .act{opacity:1}
+.act:hover{background:rgba(123,220,255,.28);border-color:rgba(123,220,255,.55);transform:translateY(-1px)}
+.act:active{transform:scale(.94)}
+.act svg{width:16px;height:16px;fill:#fff}
+.act.is-done{background:rgba(110,230,165,.38);border-color:rgba(110,230,165,.7)}
+
+/* ---- 信息区 ---- */
+.body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:11px}
+.desc{margin:0;font-size:13px;color:var(--ink-2);line-height:1.7}
+.desc b{color:var(--ink);font-weight:600}
+
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  font-size:11px;line-height:1;padding:5px 9px;border-radius:5px;
+  background:rgba(255,255,255,.055);
+  border:1px solid var(--line);
+  color:var(--ink-2);
+}
+.chip--ok{color:var(--accent);border-color:rgba(123,220,255,.26);background:rgba(123,220,255,.08)}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tags__label{font-size:12px;color:var(--ink-3)}
+.tag{
+  font:inherit;font-size:11px;padding:4px 9px;border-radius:5px;
+  background:rgba(255,255,255,.045);
+  border:1px solid var(--line);
+  color:var(--ink-2);
+  cursor:pointer;
+  transition:all .16s;
+}
+.tag:hover{background:rgba(123,220,255,.14);color:var(--accent);border-color:rgba(123,220,255,.3)}
+mark{background:rgba(123,220,255,.26);color:#fff;border-radius:2px;padding:0 1px}
+
+/* 底部进度条 */
+.bar{height:3px;background:rgba(255,255,255,.07);overflow:hidden}
+.bar__in{height:100%;width:0;background:linear-gradient(90deg,var(--accent),#b591ff);transition:width .1s linear}
+.card.is-playing .bar__in{box-shadow:0 0 12px rgba(123,220,255,.65)}
+
+/* ---- 加载/错误提示 ---- */
+.err{
+  position:absolute;inset:0;z-index:9;
+  display:none;place-items:center;
+  background:rgba(10,12,15,.9);
+  text-align:center;padding:20px;
+  font-size:12px;color:#ff8a8a;line-height:1.7;
+}
+.card.has-error .err{display:grid}
+
+/* ---- 迷你悬浮播放器（滚动/搜索都跟着走） ---- */
+.mini{
+  position:fixed;right:22px;bottom:22px;z-index:90;
+  width:min(340px, calc(100vw - 32px));
+  display:none;align-items:center;gap:11px;
+  padding:11px 13px;
+  background:rgba(23,27,33,.94);
+  border:1px solid rgba(123,220,255,.26);
+  border-radius:14px;
+  box-shadow:0 8px 18px rgba(0,0,0,.4),0 22px 60px rgba(0,0,0,.5);
+  backdrop-filter:blur(16px) saturate(1.4);
+  animation:miniIn .26s cubic-bezier(.2,.8,.3,1);
+}
+.mini.is-on{display:flex}
+@keyframes miniIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.mini__go{
+  flex:none;width:34px;height:34px;border-radius:50%;
+  border:0;padding:0;cursor:pointer;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--accent),#b591ff);
+  opacity:.92;transition:transform .16s,opacity .16s;
+}
+.mini__go:hover{transform:scale(1.07);opacity:1}
+.mini__go svg{width:15px;height:15px;fill:#0f1216}
+.mini__go .--pause{display:none}
+.mini.is-paused .mini__go .--play{display:none}
+.mini.is-paused .mini__go .--pause{display:block}
+
+.mini__info{flex:1;min-width:0}
+.mini__title{font-size:12.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini__sub{margin-top:2px;font:11px/1 ui-monospace,"Cascadia Mono",Consolas,monospace;color:var(--ink-2);letter-spacing:.3px}
+.mini__dl{
+  flex:none;width:30px;height:30px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,.045);
+  display:grid;place-items:center;cursor:pointer;
+  transition:all .16s;
+}
+.mini__dl:hover{background:rgba(123,220,255,.16);border-color:rgba(123,220,255,.4)}
+.mini__dl svg{width:15px;height:15px;fill:var(--ink-2)}
+.mini__dl:hover svg{fill:var(--accent)}
+
+/* 迷你进度条贴在底部 */
+.mini__bar{position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:0 0 14px 14px;background:rgba(255,255,255,.08);overflow:hidden}
+.mini__barIn{height:100%;width:0;background:linear-gradient(90deg,var(--accent),#b591ff)}
+
+/* ---- 提示气泡 ---- */
+.toast{
+  position:fixed;left:50%;bottom:34px;z-index:99;
+  transform:translate(-50%,14px);
+  padding:10px 18px;border-radius:10px;
+  background:rgba(30,36,44,.96);
+  border:1px solid rgba(110,230,165,.4);
+  color:#cfeede;font-size:12.5px;
+  box-shadow:0 10px 30px rgba(0,0,0,.45);
+  opacity:0;pointer-events:none;
+  transition:opacity .22s,transform .22s;
+}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:640px){
+  .wrap{padding:0 16px}
+  .topbar__in{padding:12px 16px;flex-wrap:wrap}
+  .grid{gap:18px;grid-template-columns:1fr}
+  .ring{width:110px;height:110px}
+  .mini{right:10px;left:10px;bottom:10px;width:auto}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__in">
+    <div class="brand">音<em>效</em>卡片 · 本地播放器</div>
+    <label class="search" id="search">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input id="q" type="search" placeholder="搜索曲名、标签、描述…" autocomplete="off">
+      <button class="search__clear" id="clear" title="清空">✕</button>
+    </label>
+    <div class="hint">点击圆环播放 / 暂停 · 拖动圆环可跳转</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h3 class="sect-title">本地音效库</h3>
+  <p class="sect-sub">
+    <span class="spinner" id="spin"></span>
+    <span id="count">共 <b>12</b> 首</span>
+  </p>
+  <div class="quick" id="quick"></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty">
+    <b>没有匹配的曲目</b>
+    换个关键词试试，或点上面的标签浏览
+  </div>
+</main>
+
+<!-- 迷你播放器：切换页面/滚动到别处也能控制 -->
+<div class="mini" id="mini">
+  <button class="mini__go" id="miniGo" aria-label="播放/暂停">
+    <svg class="--play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    <svg class="--pause" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+  </button>
+  <div class="mini__info">
+    <div class="mini__title" id="miniTitle">—</div>
+    <div class="mini__sub" id="miniSub">--:-- / --:--</div>
+  </div>
+  <button class="mini__dl" id="miniDl" title="下载这首">
+    <svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 011 1v9.59l3.3-3.3a1 1 0 111.4 1.42l-5 5a1 1 0 01-1.4 0l-5-5a1 1 0 111.4-1.42l3.3 3.3V4a1 1 0 011-1zM5 19a1 1 0 011-1h12a1 1 0 110 2H6a1 1 0 01-1-1z"/></svg>
+  </button>
+  <div class="mini__bar"><div class="mini__barIn" id="miniBar"></div></div>
+</div>
+
+<div class="toast" id="toast">已开始下载</div>
+
+<script>
+/* ============================================================
+   A. 曲目数据
+   ============================================================ */
+const TRACKS = [
+  /* ---------- 异世界 · 集市组 ---------- */
+  {
+    file:'audio/01-misty-market.mp3',
+    title:'异世界微风集市',
+    tag:'环境音',
+    desc:'微风穿过摊位之间的开阔集市，空气里带着布料与谷物的气味。',
+    meta:['WAV 源','48kHz / 16bit','137 秒'],
+    tags:['集市','微风','白天','环境铺底','开场'],
+    tone:['#1f6f7a','#2b4f8a']
+  },
+  {
+    file:'audio/02-market-afternoon.mp3',
+    title:'异界集市的午后',
+    tag:'场景BGM',
+    desc:'午后阳光斜照的长街，人声稀疏，适合作为城镇主界面循环曲。',
+    meta:['MP3 源','44.1kHz','124 秒'],
+    tags:['午后','城镇','循环','主界面'],
+    tone:['#8a5a1f','#7a2f5a']
+  },
+  {
+    file:'audio/03-market-afternoon-var.mp3',
+    title:'异界集市的午后（变奏）',
+    tag:'场景BGM',
+    desc:'同一主题的短版变奏，织体更薄，适合对话或事件内的低干扰背景。',
+    meta:['MP3 源','44.1kHz','86 秒'],
+    tags:['变奏','短版','对话','低干扰'],
+    tone:['#5f3f8a','#2f5a7a']
+  },
+  {
+    file:'audio/04-market.mp3',
+    title:'集市',
+    tag:'场景BGM',
+    desc:'完整长度的集市主题，情绪起伏更明显，适合作为章节主场景曲。',
+    meta:['AAC 源','44.1kHz','251 秒'],
+    tags:['集市','完整版','章节','起伏'],
+    tone:['#2f7a4f','#1f5a6f']
+  },
+  {
+    file:'audio/05-scarborough-fair.mp3',
+    title:'斯卡布罗集市（花腔吟唱翻唱）',
+    tag:'人声 / 翻唱',
+    desc:'花腔吟唱版本的《Scarborough Fair》，人声层次丰富，情绪浓度高。',
+    meta:['AAC 源','44.1kHz','251 秒'],
+    tags:['人声','翻唱','花腔','剧情高潮','片尾'],
+    tone:['#7a2f3f','#3f2f7a']
+  },
+
+  /* ---------- 三色绘恋 · 背景音乐组 ---------- */
+  {
+    file:'audio/06-sanscolor-bgm-01.mp3',
+    title:'三色绘恋 · 背景音乐 01',
+    tag:'恋爱AVG BGM',
+    desc:'钢琴为主的日常场景曲，织体干净，适合校园与对话段落。',
+    meta:['MP3 源','44.1kHz','107 秒'],
+    tags:['日常','钢琴','校园','对话','恋爱'],
+    tone:['#3f6f9a','#8a5f7a']
+  },
+  {
+    file:'audio/07-sanscolor-bgm-02.mp3',
+    title:'三色绘恋 · 背景音乐 02',
+    tag:'恋爱AVG BGM',
+    desc:'情绪稍向上的叙事段配乐，适合推进剧情或回忆插入。',
+    meta:['MP3 源','44.1kHz','113 秒'],
+    tags:['叙事','回忆','推进','抒情'],
+    tone:['#6f3f8a','#3f7a8a']
+  },
+  {
+    file:'audio/08-sanscolor-bgm-03.mp3',
+    title:'三色绘恋 · 背景音乐 03',
+    tag:'恋爱AVG BGM',
+    desc:'节奏更轻快的场景曲，适合社团、课间一类热闹段落。',
+    meta:['MP3 源','44.1kHz','116 秒'],
+    tags:['轻快','热闹','课间','社团'],
+    tone:['#8a7a2f','#2f7a5a']
+  },
+  {
+    file:'audio/09-sanscolor-bgm-04.mp3',
+    title:'三色绘恋 · 背景音乐 04',
+    tag:'恋爱AVG BGM',
+    desc:'低沉内省的段落，适合独白、失意或雨天场景。',
+    meta:['MP3 源','44.1kHz','122 秒'],
+    tags:['内省','低沉','独白','雨天'],
+    tone:['#2f4a7a','#4a2f6f']
+  },
+  {
+    file:'audio/10-sanscolor-bgm-05.mp3',
+    title:'三色绘恋 · 背景音乐 05',
+    tag:'恋爱AVG BGM',
+    desc:'情绪浓度较高的情感段落，适合告白、离别等关键剧情。',
+    meta:['MP3 源','44.1kHz','125 秒'],
+    tags:['情感','告白','离别','关键剧情'],
+    tone:['#8a3f5f','#5f2f7a']
+  },
+  {
+    file:'audio/11-sanscolor-bgm-06.mp3',
+    title:'三色绘恋 · 背景音乐 06',
+    tag:'恋爱AVG BGM',
+    desc:'收束感较强的尾声曲，适合章节结束与片尾滚动。',
+    meta:['MP3 源','44.1kHz','128 秒'],
+    tags:['尾声','收束','章节结束','片尾'],
+    tone:['#2f6f6f','#4a4a8a']
+  },
+
+  /* ---------- 高考恋爱一百天 ---------- */
+  {
+    file:'audio/12-gaokao-ost-01.mp3',
+    title:'高考恋爱一百天 · 原声 01',
+    tag:'国产AVG OST',
+    desc:'校园题材原声，旋律直白耐听，适合作为养成日常的循环底乐。',
+    meta:['MP3 源','44.1kHz','175 秒'],
+    tags:['校园','养成','循环','日常','国产'],
+    tone:['#6f8a2f','#2f6f7a']
+  },
+];
+
+/* ============================================================
+   B. 图标
+   ============================================================ */
+const ICON = {
+  play :'<svg class="ring__icon --play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+  pause:'<svg class="ring__icon --pause" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  dl   :'<svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 011 1v9.59l3.3-3.3a1 1 0 111.4 1.42l-5 5a1 1 0 01-1.4 0l-5-5a1 1 0 111.4-1.42l3.3 3.3V4a1 1 0 011-1zM5 19a1 1 0 011-1h12a1 1 0 110 2H6a1 1 0 01-1-1z"/></svg>',
+};
+
+/* ============================================================
+   C. 圆形进度环
+   ============================================================ */
+const DPR = Math.max(1, window.devicePixelRatio || 1);
+
+function fitCanvas(cv){
+  const size = cv.clientWidth || 132;
+  const px = Math.round(size * DPR);
+  if (cv.width !== px){ cv.width = cv.height = px; }
+  return size;
+}
+
+/* 绘制：progress 为 0~1，playing 决定是否显示动效 */
+function drawRing(cv, progress, playing){
+  const S = fitCanvas(cv);
+  const g = cv.getContext('2d');
+  g.setTransform(DPR,0,0,DPR,0,0);
+  g.clearRect(0,0,S,S);
+
+  const cx = S/2, cy = S/2;
+  const R  = S/2 - 6;
+  const w  = 3.5;
+  const TOP = -Math.PI/2;
+
+  // 1) 底环
+  g.beginPath();
+  g.arc(cx, cy, R, 0, Math.PI*2);
+  g.strokeStyle = 'rgba(255,255,255,.20)';
+  g.lineWidth = w;
+  g.stroke();
+
+  // 2) 进度弧
+  if (progress > 0.0005){
+    g.beginPath();
+    g.arc(cx, cy, R, TOP, TOP + Math.PI*2*progress);
+    const grad = g.createLinearGradient(0,0,S,S);
+    grad.addColorStop(0,'#7bdcff');
+    grad.addColorStop(1,'#b591ff');
+    g.strokeStyle = grad;
+    g.lineWidth = w;
+    g.lineCap = 'round';
+    g.stroke();
+    g.lineCap = 'butt';
+  } else if (!playing){
+    // 待机：短弧提示可点
+    g.beginPath();
+    g.arc(cx, cy, R, TOP, TOP + Math.PI*0.42);
+    g.strokeStyle = 'rgba(255,255,255,.72)';
+    g.lineWidth = w;
+    g.lineCap = 'round';
+    g.stroke();
+    g.lineCap = 'butt';
+  }
+
+  // 3) 播放中的内圈脉动
+  if (playing){
+    const t = performance.now()/1000;
+    const p = 0.5 + Math.sin(t*3.2)*0.5;
+    g.beginPath();
+    g.arc(cx, cy, R-11, 0, Math.PI*2);
+    g.fillStyle = 'rgba(123,220,255,'+(0.05 + 0.09*p)+')';
+    g.fill();
+
+    // 进度头部的小光点
+    if (progress > 0.0005){
+      const a = TOP + Math.PI*2*progress;
+      g.beginPath();
+      g.arc(cx + Math.cos(a)*R, cy + Math.sin(a)*R, w*0.85, 0, Math.PI*2);
+      g.fillStyle = '#ffffff';
+      g.fill();
+    }
+  }
+}
+
+/* ============================================================
+   D. 文本工具
+   ============================================================ */
+function fmtTime(sec){
+  if (!isFinite(sec) || sec < 0) return '--:--';
+  const m = Math.floor(sec/60);
+  const s = Math.floor(sec%60);
+  return m + ':' + String(s).padStart(2,'0');
+}
+/* 转义，防止标题里的特殊字符破坏 HTML */
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ============================================================
+   E. 渲染
+   ============================================================ */
+const grid  = document.getElementById('grid');
+const empty = document.getElementById('empty');
+const countEl = document.getElementById('count');
+const spinEl  = document.getElementById('spin');
+let current = null;                  // 当前播放中的 { audio, card, canvas, raf }
+let nowPlaying = null;               // 最近一次播放的卡片记录（暂停后仍保留，供迷你条控制）
+
+/* ============================================================
+   E0. 下载 / 提示
+   ============================================================ */
+function baseName(p){ return p.split('/').pop(); }
+
+function download(file, title, btn){
+  const name = baseName(file);
+  const a = document.createElement('a');
+  a.href = file;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('已开始下载：' + title);
+  if (btn){
+    btn.classList.add('is-done');
+    setTimeout(() => btn.classList.remove('is-done'), 1400);
+  }
+}
+
+const toastEl = document.getElementById('toast');
+let toastTimer = 0;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('is-on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('is-on'), 2200);
+}
+
+/* 全局只允许一个在播 —— 对应淘声网的 soundManager.stopAll() */
+function stopCurrent(){
+  if (!current) return;
+  const c = current;
+  current = null;
+  c.audio.pause();
+  c.card.classList.remove('is-playing');
+  cancelAnimationFrame(c.raf);
+  drawRing(c.canvas, c.audio.currentTime / (c.audio.duration||1), false);
+  releaseWakeLock();
+}
+
+/* 保持播放状态：所有卡片一次性建好，搜索仅切换 hidden，不影响正在播放的音频 */
+const cards = TRACKS.map((t, i) => {
+  const rec = { t, el:null, titleEl:null, descEl:null, audio:null, play:null, pause:null };
+  const el = document.createElement('article');
+  el.className = 'card';
+  el.dataset.idx = i;
+  el.innerHTML = `
+    <div class="cover" style="background-image:linear-gradient(128deg, ${t.tone[0]}, ${t.tone[1]})">
+      <div class="player">
+        <button class="ring" aria-label="播放 ${esc(t.title)}">
+          <canvas></canvas>
+          <span class="ring__mid">
+            ${ICON.play}${ICON.pause}
+            <span class="ring__time">--:--</span>
+          </span>
+        </button>
+      </div>
+      <div class="acts">
+        <button class="act" data-dl title="下载这首 MP3">${ICON.dl}</button>
+      </div>
+      <div class="cover__meta">
+        <div class="cover__title" title="${esc(t.title)}"><span class="hl"></span></div>
+        <div class="cover__row">
+          <span class="cover__tag">${esc(t.tag)}</span>
+        </div>
+      </div>
+      <div class="err">音频加载失败<br><span style="color:#9aa5b1">请确认同目录下存在 audio 文件夹<br></span></div>
+    </div>
+
+    <div class="body">
+      <p class="desc"><b>说明：</b><span class="hl-desc"></span></p>
+      <div class="meta">
+        <span class="chip chip--ok">MP3</span>
+        ${t.meta.map(m => `<span class="chip">${esc(m)}</span>`).join('')}
+      </div>
+      <div class="tags">
+        <span class="tags__label">Tag:</span>
+        ${t.tags.map(x => `<button class="tag" data-tag="${esc(x)}">${esc(x)}</button>`).join('')}
+      </div>
+    </div>
+    <div class="bar"><div class="bar__in"></div></div>
+  `;
+  grid.appendChild(el);
+
+  /* ---- 元素引用 ---- */
+  const ring    = el.querySelector('.ring');
+  const canvas  = el.querySelector('canvas');
+  const timeEl  = el.querySelector('.ring__time');
+  const barIn   = el.querySelector('.bar__in');
+
+  /* ---- 音频 ---- */
+  const audio = new Audio(t.file);
+  audio.preload = 'metadata';
+
+  audio.addEventListener('loadedmetadata', () => {
+    timeEl.textContent = fmtTime(audio.duration);
+    drawRing(canvas, 0, false);
+  });
+  audio.addEventListener('error', () => {
+    el.classList.add('has-error');
+    timeEl.textContent = '--:--';
+  });
+  audio.addEventListener('ended', () => { stopCurrent(); });
+
+  /* ---- 绘制循环 ---- */
+  let raf = 0;
+  const tick = () => {
+    const d = audio.duration || 1;
+    const p = Math.min(1, audio.currentTime / d);
+    drawRing(canvas, p, true);
+    timeEl.textContent = fmtTime(audio.currentTime);
+    barIn.style.width = (p*100).toFixed(2) + '%';
+    syncMini(audio.currentTime, audio.duration, p);
+    if (current && current.audio === audio){
+      current.raf = requestAnimationFrame(tick);
+    }
+  };
+
+  /* ---- 播放 / 暂停 ---- */
+  function play(){
+    if (current && current.audio !== audio) stopCurrent();
+    audio.play().then(() => {
+      el.classList.add('is-playing');
+      current = { audio, card: el, canvas, raf: 0 };
+      nowPlaying = rec;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(tick);
+      current.raf = raf;
+      syncMini(audio.currentTime, audio.duration, 0, true);
+      requestWakeLock();                 // 播放期间顶住系统休眠
+    }).catch(err => {
+      console.warn('[播放失败]', t.title, err);
+      el.classList.add('has-error');
+    });
+  }
+  function pause(){
+    audio.pause();
+    el.classList.remove('is-playing');
+    cancelAnimationFrame(raf);
+    drawRing(canvas, audio.currentTime/(audio.duration||1), false);
+    if (current && current.audio === audio) current = null;
+    syncMini(audio.currentTime, audio.duration, audio.currentTime/(audio.duration||1), true);
+    releaseWakeLock();
+  }
+
+  ring.addEventListener('click', e => {
+    e.preventDefault();
+    audio.paused ? play() : pause();
+  });
+
+  /* ---- 拖动圆环跳转进度 ---- */
+  let dragging = false;
+  const seekFromEvent = ev => {
+    const r = canvas.getBoundingClientRect();
+    const pt = ev.touches ? ev.touches[0] : ev;
+    const dx = pt.clientX - (r.left + r.width/2);
+    const dy = pt.clientY - (r.top  + r.height/2);
+    // 从正上方开始顺时针的角度 → 0~1
+    let a = Math.atan2(dy, dx) + Math.PI/2;
+    if (a < 0) a += Math.PI*2;
+    const p = a / (Math.PI*2);
+    if (isFinite(audio.duration)) audio.currentTime = p * audio.duration;
+    drawRing(canvas, p, !audio.paused);
+    timeEl.textContent = fmtTime(audio.currentTime);
+    barIn.style.width = (p*100).toFixed(2) + '%';
+  };
+
+  const startDrag = ev => {
+    if (!isFinite(audio.duration)) return;
+    dragging = true;
+    el.dataset.dragMoved = '0';
+    seekFromEvent(ev);
+    ev.preventDefault();
+  };
+  const moveDrag = ev => { if (dragging){ el.dataset.dragMoved='1'; seekFromEvent(ev); ev.preventDefault(); } };
+  const endDrag  = () => { dragging = false; };
+
+  ring.addEventListener('mousedown', startDrag);
+  window.addEventListener('mousemove', moveDrag);
+  window.addEventListener('mouseup', endDrag);
+  ring.addEventListener('touchstart', startDrag, {passive:false});
+  window.addEventListener('touchmove', moveDrag, {passive:false});
+  window.addEventListener('touchend', endDrag);
+
+  /* 拖动过就不触发 click 的播放切换 */
+  ring.addEventListener('click', e => {
+    if (el.dataset.dragMoved === '1'){ e.stopImmediatePropagation(); el.dataset.dragMoved = '0'; }
+  }, true);
+
+  /* ---- 首屏预绘制 ---- */
+  drawRing(canvas, 0, false);
+
+  /* ---- 下载按钮 ---- */
+  el.querySelector('[data-dl]').addEventListener('click', e => {
+    e.stopPropagation();
+    download(t.file, t.title, e.currentTarget);
+  });
+
+  Object.assign(rec, {
+    el, audio, play, pause,
+    titleEl: el.querySelector('.cover__title .hl'),
+    descEl : el.querySelector('.hl-desc')
+  });
+  return rec;
+});
+
+/* ============================================================
+   F. 搜索 / 过滤
+   ============================================================ */
+const qInput  = document.getElementById('q');
+const searchBox = document.getElementById('search');
+const clearBtn = document.getElementById('clear');
+
+/* 每张卡预先算好可搜索的文本（曲名 + 标签 + 描述 + 分类 + 芯片） */
+cards.forEach(c => {
+  c.haystack = [
+    c.t.title, c.t.tag, c.t.desc, c.t.tags.join(' '), c.t.meta.join(' '), 'mp3'
+  ].join(' ').toLowerCase();
+});
+/* 记录标题/描述的原始文本，用于高亮还原 */
+cards.forEach(c => { c.titleEl.textContent = c.t.title; c.descEl.textContent = c.t.desc; });
+
+/* 高亮：把命中的片段包进 <mark> */
+function highlight(node, raw, terms){
+  if (!terms.length){ node.textContent = raw; return; }
+  const low = raw.toLowerCase();
+  // 找出所有命中区间，做一次合并
+  const spans = [];
+  terms.forEach(term => {
+    let from = 0, at;
+    while ((at = low.indexOf(term, from)) !== -1){
+      spans.push([at, at + term.length]);
+      from = at + term.length;
+    }
+  });
+  if (!spans.length){ node.textContent = raw; return; }
+  spans.sort((a,b) => a[0]-b[0]);
+  const merged = [spans[0]];
+  for (let i = 1; i < spans.length; i++){
+    const last = merged[merged.length-1];
+    if (spans[i][0] <= last[1]) last[1] = Math.max(last[1], spans[i][1]);
+    else merged.push(spans[i]);
+  }
+  node.textContent = '';
+  let cursor = 0;
+  merged.forEach(([s,e]) => {
+    if (s > cursor) node.appendChild(document.createTextNode(raw.slice(cursor, s)));
+    const m = document.createElement('mark');
+    m.textContent = raw.slice(s, e);
+    node.appendChild(m);
+    cursor = e;
+  });
+  if (cursor < raw.length) node.appendChild(document.createTextNode(raw.slice(cursor)));
+}
+
+let activeTag = '';          // 由标签按钮触发的过滤（会同步写进搜索框）
+
+function applyFilter(){
+  const raw = qInput.value.trim();
+  const terms = raw.toLowerCase().split(/\s+/).filter(Boolean);
+  searchBox.classList.toggle('has-value', !!raw);
+
+  let hit = 0;
+  cards.forEach(c => {
+    const ok = terms.length === 0 || terms.every(t => c.haystack.includes(t));
+    c.el.hidden = !ok;
+    if (ok){
+      hit++;
+      highlight(c.titleEl, c.t.title, terms);
+      highlight(c.descEl,  c.t.desc,  terms);
+    }
+  });
+
+  empty.classList.toggle('is-on', hit === 0);
+  spinEl.style.display = raw || activeTag ? '' : 'none';
+  countEl.innerHTML = raw || activeTag
+    ? `找到 <b>${hit}</b> 首 · 共 ${cards.length} 首`
+    : `共 <b>${cards.length}</b> 首`;
+}
+
+/* ---- 输入即搜（带 120ms 防抖，避免长列表连打时频繁重排） ---- */
+let debounce = 0;
+qInput.addEventListener('input', () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => { activeTag = ''; syncQuick(); applyFilter(); }, 120);
+});
+qInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){ qInput.value = ''; activeTag = ''; syncQuick(); applyFilter(); }
+});
+clearBtn.addEventListener('click', () => {
+  qInput.value = ''; activeTag = ''; syncQuick(); applyFilter(); qInput.focus();
+});
+
+/* ---- 卡片上的 Tag 点击 → 填入搜索框 ---- */
+grid.addEventListener('click', e => {
+  const b = e.target.closest('.tag[data-tag]');
+  if (!b) return;
+  qInput.value = b.dataset.tag;
+  activeTag = b.dataset.tag;
+  syncQuick();
+  applyFilter();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+/* ---- 顶部快捷标签（从数据里自动汇总出现次数 Top N） ---- */
+const quickBox = document.getElementById('quick');
+const tagFreq = new Map();
+TRACKS.forEach(t => t.tags.forEach(x => tagFreq.set(x, (tagFreq.get(x)||0) + 1)));
+const QUICK_TAGS = [...tagFreq.entries()]
+  .filter(([, n]) => n >= 2)                    // 只展示跨曲目复用的标签
+  .sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],'zh'))
+  .slice(0, 10)
+  .map(([name]) => name);
+
+QUICK_TAGS.forEach(name => {
+  const b = document.createElement('button');
+  b.className = 'quick__btn';
+  b.dataset.tag = name;
+  b.textContent = name;
+  quickBox.appendChild(b);
+});
+
+function syncQuick(){
+  quickBox.querySelectorAll('.quick__btn').forEach(b => {
+    b.classList.toggle('is-on', b.dataset.tag === activeTag);
+  });
+}
+
+quickBox.addEventListener('click', e => {
+  const b = e.target.closest('.quick__btn');
+  if (!b) return;
+  const name = b.dataset.tag;
+  if (activeTag === name){                       // 再点一次取消
+    activeTag = ''; qInput.value = '';
+  } else {
+    activeTag = name; qInput.value = name;
+  }
+  syncQuick();
+  applyFilter();
+});
+
+/* ============================================================
+   G. 迷你播放器（滚到别处、或切卡搜索时依然能控制）
+   ============================================================ */
+const miniEl    = document.getElementById('mini');
+const miniGo    = document.getElementById('miniGo');
+const miniTitle = document.getElementById('miniTitle');
+const miniSub   = document.getElementById('miniSub');
+const miniBar   = document.getElementById('miniBar');
+const miniDl    = document.getElementById('miniDl');
+
+/* 由卡片绘制循环每帧调用；showNow=true 时顺带刷新标题（切歌时用） */
+let miniPrev = { txt:'', w:'', paused:null };
+function syncMini(cur, dur, p, showNow){
+  if (!nowPlaying) return;
+  const a = nowPlaying.audio;
+  if (showNow){
+    miniEl.classList.add('is-on');
+    miniTitle.textContent = nowPlaying.t.title;
+    miniDl.dataset.file  = nowPlaying.t.file;
+    miniDl.dataset.title = nowPlaying.t.title;
+  }
+  /* 只在秒数变化时改文本，避免每帧触发重排 */
+  const txt = fmtTime(cur) + ' / ' + fmtTime(a.duration);
+  if (txt !== miniPrev.txt){ miniSub.textContent = txt; miniPrev.txt = txt; }
+  const w = (Math.min(1, p || 0) * 100).toFixed(2) + '%';
+  if (w !== miniPrev.w){ miniBar.style.width = w; miniPrev.w = w; }
+  if (a.paused !== miniPrev.paused){
+    miniEl.classList.toggle('is-paused', a.paused);
+    miniPrev.paused = a.paused;
+  }
+}
+
+miniGo.addEventListener('click', () => {
+  if (!nowPlaying) return;
+  nowPlaying.audio.paused ? nowPlaying.play() : nowPlaying.pause();
+});
+
+miniDl.addEventListener('click', () => {
+  if (!miniDl.dataset.file) return;
+  download(miniDl.dataset.file, miniDl.dataset.title, null);
+});
+
+/* ---- 启动 ---- */
+applyFilter();
+
+/* ============================================================
+   H. 后台继续播放
+   ------------------------------------------------------------
+   浏览器的硬性规则：标签页切到后台时，只要页面没被丢弃、
+   电脑没休眠，<audio> 仍会继续出声（旧版代码里那句
+   visibilitychange → stopCurrent 才是声音被掐断的原因，已移除）。
+   剩下唯一会打断的是系统为省电主动休眠，所以播放期间申请
+   Screen Wake Lock 顶住；暂停/播放完就释放，不白耗电。
+   ============================================================ */
+let wakeLock = null;
+
+async function requestWakeLock(){
+  if (wakeLock || !('wakeLock' in navigator)) return;
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  }catch(err){
+    console.info('[WakeLock] 未申请到（不影响播放）:', err.message);
+  }
+}
+function releaseWakeLock(){
+  if (!wakeLock) return;
+  wakeLock.release().catch(() => {});
+  wakeLock = null;
+}
+
+document.addEventListener('visibilitychange', () => {
+  // 回到前台时若仍在播但锁被系统回收了，补申请一次
+  if (document.visibilityState === 'visible' && current && !wakeLock) requestWakeLock();
+  // 后台时不暂停 —— 这是"切页面继续播"的关键
+});
+</script>
+</body>
+</html>
