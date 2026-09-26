@@ -342,9 +342,74 @@ mark{background:rgba(123,220,255,.26);color:#fff;border-radius:2px;padding:0 1px
   .ring{width:110px;height:110px}
   .mini{right:10px;left:10px;bottom:10px;width:auto}
 }
+/* ============ 口令门 ============ */
+.gate{
+  position:fixed;inset:0;z-index:999;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;background:var(--bg);
+}
+.gate__box{
+  width:100%;max-width:330px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  box-shadow:var(--shadow);
+  padding:30px 24px 24px;
+  text-align:center;
+}
+.gate__lock{
+  width:46px;height:46px;margin:0 auto 16px;
+  display:grid;place-items:center;
+  border-radius:50%;
+  background:rgba(123,220,255,.10);
+  border:1px solid rgba(123,220,255,.22);
+}
+.gate__lock svg{width:22px;height:22px;fill:var(--accent)}
+.gate__title{margin:0 0 6px;font-size:17px;font-weight:700;letter-spacing:.5px}
+.gate__sub{margin:0 0 18px;font-size:12.5px;color:var(--ink-3)}
+.gate__input{
+  width:100%;height:44px;padding:0 14px;
+  font:inherit;font-size:15px;letter-spacing:1px;
+  color:var(--ink);background:#0e1116;
+  border:1px solid var(--line);border-radius:10px;
+  outline:none;transition:border-color .18s,box-shadow .18s;
+}
+.gate__input::placeholder{color:var(--ink-3);letter-spacing:0}
+.gate__input:focus{border-color:rgba(123,220,255,.5);box-shadow:0 0 0 3px rgba(123,220,255,.12)}
+.gate__err{min-height:16px;margin:8px 0 12px;font-size:12px;color:#ff8b8b}
+.gate__btn{
+  width:100%;height:42px;
+  font:inherit;font-size:14px;font-weight:600;letter-spacing:1px;
+  color:#06222c;background:var(--accent);
+  border:0;border-radius:10px;cursor:pointer;
+  transition:filter .18s,transform .12s;
+}
+.gate__btn:hover{filter:brightness(1.08)}
+.gate__btn:active{transform:scale(.985)}
+@keyframes gateShake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-7px)}
+  40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(3px)}
+}
+.gate__box.shake{animation:gateShake .36s}
 </style>
 </head>
 <body>
+
+<div class="gate" id="gate">
+  <form class="gate__box" id="gateForm" autocomplete="off">
+    <div class="gate__lock">
+      <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 00-5 5v3H6a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2v-8a2 2 0 00-2-2h-1V7a5 5 0 00-5-5zm0 2a3 3 0 013 3v3H9V7a3 3 0 013-3zm0 10a2 2 0 011 3.73V19a1 1 0 01-2 0v-1.27A2 2 0 0112 14z"/></svg>
+    </div>
+    <h2 class="gate__title">需要密码</h2>
+    <p class="gate__sub">输入密码后即可进入播放器</p>
+    <input class="gate__input" id="gatePw" type="password" inputmode="numeric" placeholder="请输入密码" autocomplete="off">
+    <p class="gate__err" id="gateErr"></p>
+    <button class="gate__btn" type="submit">进 入</button>
+  </form>
+</div>
 
 <header class="topbar">
   <div class="topbar__in">
@@ -391,6 +456,54 @@ mark{background:rgba(123,220,255,.26);color:#fff;border-radius:2px;padding:0 1px
 <div class="toast" id="toast">已开始下载</div>
 
 <script>
+/* ============================================================
+   0. 密码门
+   ------------------------------------------------------------
+   说明：这是「防误入」级别的前端口令，不是安全防护。
+   密码以字符串形式写在本文件里，懂技术的人打开源码就能看到，
+   也能直接下载 audio/ 里的音频文件。
+   如果哪天需要真正保密，得改用带服务端校验的托管方式。
+   ============================================================ */
+const GATE_PW = 'q1444070450';
+const GATE_KEY = 'music-card-unlocked';
+
+(function gate(){
+  const box  = document.getElementById('gate');
+  const form = document.getElementById('gateForm');
+  const pw   = document.getElementById('gatePw');
+  const err  = document.getElementById('gateErr');
+
+  const unlock = () => {
+    box.remove();
+    document.documentElement.classList.remove('locked');
+    bootPlayer();                 /* 解锁后才初始化播放器 */
+  };
+
+  /* 本次会话已解锁过就直接放行（刷新、来回切换都不再问） */
+  try { if (sessionStorage.getItem(GATE_KEY) === '1') return unlock(); } catch(e){}
+
+  document.documentElement.classList.add('locked');
+  pw.focus();
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    if (pw.value === GATE_PW){
+      try { sessionStorage.setItem(GATE_KEY, '1'); } catch(e){}
+      unlock();
+    } else {
+      err.textContent = '密码不对，再试一次';
+      pw.value = '';
+      pw.focus();
+      form.classList.remove('shake');
+      void form.offsetWidth;          /* 强制重排，让动画能重复播放 */
+      form.classList.add('shake');
+    }
+  });
+})();
+
+/* 主逻辑包成一个函数：只有解锁后才跑（函数声明会提升，上面可以提前引用） */
+function bootPlayer(){
+
 /* ============================================================
    A. 曲目数据
    ============================================================ */
@@ -1053,6 +1166,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && current && !wakeLock) requestWakeLock();
   // 后台时不暂停 —— 这是"切页面继续播"的关键
 });
+
+}  /* ← bootPlayer 结束 */
 </script>
 </body>
 </html>
