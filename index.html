@@ -125,6 +125,23 @@ a{color:inherit;text-decoration:none}
 .empty.is-on{display:block}
 .empty b{display:block;font-size:16px;color:var(--ink-2);margin-bottom:6px;font-weight:600}
 
+/* ---- 加载更多（分页，首屏只渲染前 PAGE_SIZE 张） ---- */
+.morePage{
+  display:block;
+  margin:30px auto 0;
+  height:46px;padding:0 30px;
+  font:inherit;font-size:13.5px;font-weight:600;letter-spacing:.5px;
+  color:var(--ink-2);
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--line);
+  border-radius:23px;
+  cursor:pointer;
+  transition:background .18s,border-color .18s,color .18s,transform .12s;
+}
+.morePage:hover{background:rgba(123,220,255,.14);border-color:rgba(123,220,255,.4);color:var(--accent)}
+.morePage:active{transform:scale(.985)}
+.morePage[hidden]{display:none}
+
 /* ============ 卡片 ============ */
 .card{
   position:relative;
@@ -139,6 +156,8 @@ a{color:inherit;text-decoration:none}
 .card:hover{transform:translateY(-5px);box-shadow:var(--shadow-hi);border-color:rgba(255,255,255,.14)}
 .card.is-playing{border-color:rgba(123,220,255,.42)}
 .card[hidden]{display:none}
+.card.is-in{animation:cardIn .32s cubic-bezier(.2,.8,.3,1)}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 
 /* ---- 封面区 ---- */
 .cover{
@@ -603,6 +622,7 @@ mark{background:rgba(123,220,255,.26);color:#fff;border-radius:2px;padding:0 1px
     <b>没有匹配的曲目</b>
     换个关键词试试，或点上面的标签浏览
   </div>
+  <button class="morePage" id="morePage" hidden>加载更多</button>
 </main>
 
 <!-- 迷你播放器：切换页面/滚动到别处也能控制 -->
@@ -950,8 +970,14 @@ const grid  = document.getElementById('grid');
 const empty = document.getElementById('empty');
 const countEl = document.getElementById('count');
 const spinEl  = document.getElementById('spin');
+const morePageBtn = document.getElementById('morePage');
 let current = null;                  // 当前播放中的 { audio, card, canvas, raf }
 let nowPlaying = null;               // 最近一次播放的卡片记录（暂停后仍保留，供迷你条控制）
+
+/* 首屏只渲染这么多张，其余点“加载更多”再建 —— 卡片是懒建的：
+   没进过 DOM 的曲目不会创建 <audio>（避免几百个并发 range 请求）、
+   不会分配 canvas 后备缓冲、也不占 DOM 节点。 */
+const PAGE_SIZE = 24;
 
 /* ============================================================
    E0. 下载 / 提示
@@ -1013,12 +1039,19 @@ function stopCurrent(){
   releaseWakeLock();
 }
 
-/* 保持播放状态：所有卡片一次性建好，搜索仅切换 hidden，不影响正在播放的音频 */
-const cards = TRACKS.map((t, i) => {
-  const rec = { t, el:null, titleEl:null, descEl:null, audio:null, play:null, pause:null };
+/* 卡片按需创建：这里只建数据壳，DOM 与 <audio> 等到真正要显示时才建。
+   搜索走 applyFilter 全量匹配，命中的卡片会被按需建成，所以搜得到全部曲目；
+   没进过 grid 的卡片则不会发音频请求、不分配 canvas、不占 DOM。 */
+const cards = TRACKS.map((t, i) => ({
+  t, idx:i, el:null, titleEl:null, descEl:null, audio:null, play:null, pause:null, built:false
+}));
+
+/* 真正建一张卡：DOM、audio、绘制循环、事件全在这里 */
+function buildCard(rec){
+  const t = rec.t;
   const el = document.createElement('article');
-  el.className = 'card';
-  el.dataset.idx = i;
+  el.className = 'card is-in';
+  el.dataset.idx = rec.idx;
   el.innerHTML = `
     <div class="cover" data-open style="background-image:linear-gradient(128deg, ${t.tone[0]}, ${t.tone[1]})">
       <div class="player">
@@ -1057,6 +1090,8 @@ const cards = TRACKS.map((t, i) => {
     <div class="bar"><div class="bar__in"></div></div>
   `;
   grid.appendChild(el);
+  /* 入场动画播完就摘掉，避免之后重排时再放一遍 */
+  el.addEventListener('animationend', () => el.classList.remove('is-in'), { once:true });
 
   /* ---- 元素引用 ---- */
   const ring    = el.querySelector('.ring');
@@ -1173,13 +1208,16 @@ const cards = TRACKS.map((t, i) => {
     download(t.file, t.title, e.currentTarget);
   });
 
-  Object.assign(rec, {
-    el, audio, play, pause,
-    titleEl: el.querySelector('.cover__title .hl'),
-    descEl : el.querySelector('.hl-desc')
-  });
-  return rec;
-});
+  rec.el      = el;
+  rec.audio   = audio;
+  rec.play    = play;
+  rec.pause   = pause;
+  rec.titleEl = el.querySelector('.cover__title .hl');
+  rec.descEl  = el.querySelector('.hl-desc');
+  rec.titleEl.textContent = t.title;
+  rec.descEl.textContent  = t.desc;
+  rec.built   = true;
+}
 
 /* ============================================================
    F. 搜索 / 过滤
@@ -1194,8 +1232,6 @@ cards.forEach(c => {
     c.t.title, c.t.tag, c.t.desc, c.t.tags.join(' '), c.t.meta.join(' '), 'mp3'
   ].join(' ').toLowerCase();
 });
-/* 记录标题/描述的原始文本，用于高亮还原 */
-cards.forEach(c => { c.titleEl.textContent = c.t.title; c.descEl.textContent = c.t.desc; });
 
 /* 高亮：把命中的片段包进 <mark> */
 function highlight(node, raw, terms){
@@ -1232,28 +1268,66 @@ function highlight(node, raw, terms){
 
 let activeTag = '';          // 由标签按钮触发的过滤（会同步写进搜索框）
 
-function applyFilter(){
+let matched = [];            // 当前条件下命中的全部曲目（全量，与分页无关）
+let shown   = 0;             // 其中已经渲染出来的张数
+
+/* 全量匹配：搜索永远走完整数据，跟"已经渲染了几张"无关，
+   所以没进过 DOM 的曲目一样能被搜到、被高亮。 */
+function computeMatched(){
   const raw = qInput.value.trim();
   const terms = raw.toLowerCase().split(/\s+/).filter(Boolean);
   searchBox.classList.toggle('has-value', !!raw);
+  matched = terms.length === 0
+    ? cards.slice()
+    : cards.filter(c => terms.every(t => c.haystack.includes(t)));
+  return terms;
+}
 
-  let hit = 0;
-  cards.forEach(c => {
-    const ok = terms.length === 0 || terms.every(t => c.haystack.includes(t));
-    c.el.hidden = !ok;
-    if (ok){
-      hit++;
-      highlight(c.titleEl, c.t.title, terms);
-      highlight(c.descEl,  c.t.desc,  terms);
-    }
-  });
+/* 把 matched 里前 shown 张渲染出来，其余已建的藏起来。
+   顺手保证 DOM 顺序与 matched 顺序一致 —— 懒建的卡片只会 append 到末尾，
+   不校正的话「加载更多」建出来的卡会排在旧卡后面，搜索命中顺序就乱了。
+   只有位置不对的卡片才真的搬动，正常情况下这个循环一次 DOM 都不挪。 */
+function renderCards(terms){
+  const visible = new Set(matched.slice(0, shown));
 
-  empty.classList.toggle('is-on', hit === 0);
+  let cursor = grid.firstElementChild;      // 下一个"应有的"节点
+  for (let i = 0; i < shown && i < matched.length; i++){
+    const rec = matched[i];
+    if (!rec.built) buildCard(rec);         // 会 append 到末尾，下面再挪到正确位置
+    rec.el.hidden = false;
+    highlight(rec.titleEl, rec.t.title, terms);
+    highlight(rec.descEl,  rec.t.desc,  terms);
+    if (rec.el !== cursor) grid.insertBefore(rec.el, cursor);
+    else cursor = cursor.nextElementSibling;
+  }
+
+  /* 建过但这次不该露面的（没命中，或命中但落在本页之外），藏起来 */
+  cards.forEach(c => { if (c.built && !visible.has(c)) c.el.hidden = true; });
+}
+
+function applyFilter(resetPaging = true){
+  const terms = computeMatched();
+  if (resetPaging) shown = PAGE_SIZE;
+  if (shown > matched.length) shown = matched.length;
+
+  renderCards(terms);
+
+  const raw = qInput.value.trim();
+  const left = matched.length - shown;
+  empty.classList.toggle('is-on', matched.length === 0);
   spinEl.style.display = raw || activeTag ? '' : 'none';
   countEl.innerHTML = raw || activeTag
-    ? `找到 <b>${hit}</b> 首 · 共 ${cards.length} 首`
+    ? `找到 <b>${matched.length}</b> 首 · 共 ${cards.length} 首`
     : `共 <b>${cards.length}</b> 首`;
+  morePageBtn.hidden = left <= 0;
+  morePageBtn.textContent = `加载更多（还剩 ${left} 首）`;
 }
+
+/* 加载更多：把已渲染张数往前推一页，不重算过滤条件 */
+morePageBtn.addEventListener('click', () => {
+  shown += PAGE_SIZE;
+  applyFilter(false);
+});
 
 /* ---- 输入即搜（带 120ms 防抖，避免长列表连打时频繁重排） ---- */
 let debounce = 0;
