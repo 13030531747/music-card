@@ -805,7 +805,8 @@ const TRACKS = [
     desc:'钢琴为主的日常场景曲，织体干净，适合校园与对话段落。',
     meta:['MP3 源','44.1kHz','107 秒'],
     tags:['日常','钢琴','校园','对话','恋爱'],
-    tone:['#3f6f9a','#8a5f7a']
+    tone:['#3f6f9a','#8a5f7a'],
+    image:'images/06-sanscolor.jpg'
   },
   {
     file:'audio/07-sanscolor-bgm-02.mp3',
@@ -814,7 +815,8 @@ const TRACKS = [
     desc:'情绪稍向上的叙事段配乐，适合推进剧情或回忆插入。',
     meta:['MP3 源','44.1kHz','113 秒'],
     tags:['叙事','回忆','推进','抒情'],
-    tone:['#6f3f8a','#3f7a8a']
+    tone:['#6f3f8a','#3f7a8a'],
+    image:'images/07-sanscolor.jpg'
   },
   {
     file:'audio/08-sanscolor-bgm-03.mp3',
@@ -823,7 +825,8 @@ const TRACKS = [
     desc:'节奏更轻快的场景曲，适合社团、课间一类热闹段落。',
     meta:['MP3 源','44.1kHz','116 秒'],
     tags:['轻快','热闹','课间','社团'],
-    tone:['#8a7a2f','#2f7a5a']
+    tone:['#8a7a2f','#2f7a5a'],
+    image:'images/08-sanscolor.jpg'
   },
   {
     file:'audio/09-sanscolor-bgm-04.mp3',
@@ -832,7 +835,8 @@ const TRACKS = [
     desc:'低沉内省的段落，适合独白、失意或雨天场景。',
     meta:['MP3 源','44.1kHz','122 秒'],
     tags:['内省','低沉','独白','雨天'],
-    tone:['#2f4a7a','#4a2f6f']
+    tone:['#2f4a7a','#4a2f6f'],
+    image:'images/09-sanscolor.jpg'
   },
   {
     file:'audio/10-sanscolor-bgm-05.mp3',
@@ -841,7 +845,8 @@ const TRACKS = [
     desc:'情绪浓度较高的情感段落，适合告白、离别等关键剧情。',
     meta:['MP3 源','44.1kHz','125 秒'],
     tags:['情感','告白','离别','关键剧情'],
-    tone:['#8a3f5f','#5f2f7a']
+    tone:['#8a3f5f','#5f2f7a'],
+    image:'images/10-sanscolor.jpg'
   },
   {
     file:'audio/11-sanscolor-bgm-06.mp3',
@@ -850,7 +855,8 @@ const TRACKS = [
     desc:'收束感较强的尾声曲，适合章节结束与片尾滚动。',
     meta:['MP3 源','44.1kHz','128 秒'],
     tags:['尾声','收束','章节结束','片尾'],
-    tone:['#2f6f6f','#4a4a8a']
+    tone:['#2f6f6f','#4a4a8a'],
+    image:'images/11-sanscolor.jpg'
   },
 
   /* ---------- 高考恋爱一百天 ---------- */
@@ -861,7 +867,8 @@ const TRACKS = [
     desc:'校园题材原声，旋律直白耐听，适合作为养成日常的循环底乐。',
     meta:['MP3 源','44.1kHz','175 秒'],
     tags:['校园','养成','循环','日常','国产'],
-    tone:['#6f8a2f','#2f6f7a']
+    tone:['#6f8a2f','#2f6f7a'],
+    image:'images/12-gaokao.jpg'
   },
 ];
 
@@ -1053,7 +1060,7 @@ function buildCard(rec){
   el.className = 'card is-in';
   el.dataset.idx = rec.idx;
   el.innerHTML = `
-    <div class="cover" data-open style="background-image:linear-gradient(128deg, ${t.tone[0]}, ${t.tone[1]})">
+    <div class="cover" data-open style="background-image:${t.image ? `url('${t.image}'), ` : ''}linear-gradient(128deg, ${t.tone[0]}, ${t.tone[1]})">
       <div class="player">
         <button class="ring" aria-label="播放 ${esc(t.title)}">
           <canvas></canvas>
@@ -1439,7 +1446,7 @@ function openDetail(rec){
   const t = rec.t;
 
   detailHero.style.backgroundImage =
-    `linear-gradient(128deg, ${t.tone[0]}, ${t.tone[1]})`;
+    `${t.image ? `url('${t.image}'), ` : ''}linear-gradient(128deg, ${t.tone[0]}, ${t.tone[1]})`;
   detailTitle.textContent  = t.title;
   detailTagEl.textContent  = t.tag;
   detailDesc.textContent   = t.desc;
